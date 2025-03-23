@@ -1,22 +1,11 @@
-<svelte:options runes={true} />
-
 <script lang="ts">
-	import { DragController } from '$lib/drag/drag.controller.svelte.js';
-
-	// import { asDraggable } from '$lib/drag/drag.svelte.js';
-	// import Drag from '$lib/drag/Drag.svelte';
-	import { DropController } from '$lib/drop/drop.controller.svelte.js';
+	import Drag from '$lib/drag/Drag.svelte';
+	import DragNDrop from '$lib/dragndrop/DragNDrop.svelte';
 	import Drop from '$lib/drop/Drop.svelte';
-	import { Spring } from 'svelte/motion';
 	let draggables: string[] = $state(['drag', 'test', 'poo']);
-	function addNewDrag() {
-		draggables.push('Drag');
-	}
-	const { asDrop: asDrop1 } = new DropController();
-	const { asDrop: asDrop2 } = new DropController();
 </script>
 
-{#snippet Drag(dragController: DragController, id: string, idx: number)}
+<!-- {#snippet Drag(dragController: DragController, id: string, idx: number)}
 	<div
 		style="translate:{dragController.translation.current.x}px {dragController.translation.current
 			.y}px"
@@ -27,38 +16,43 @@
 	>
 		Drag Me {idx}
 	</div>
-{/snippet}
+{/snippet} -->
 <h1>Drag and Drop Svelte</h1>
 <main class="">
-	<!-- <Drag id={'drag-1'} class="my-draggable">
-		<span>Drag me 1</span>
-	</Drag>
-	<Drag id={'drag-2'} class="my-draggable">
-		<span>Drag me 2</span>
-	</Drag>
-	<Drag id={'drag-3'} class="my-draggable">
-		<span>Drag me 3 </span>
-	</Drag> -->
-	<!-- <Drop class="drop-1 drop-zone" id={'drop-1'}>
-		<button class="my-button" onclick={addNewDrag}>Add new Item</button>
+	<Drop id={'drop-main'} orientation={'horizontal'}>
+		<Drag id={'drag-1'} class="my-draggable">
+			<span>Drag me 1</span>
+		</Drag>
+		<Drag id={'drag-2'} class="my-draggable">
+			<span>Drag me 2</span>
+		</Drag>
+		<Drag id={'drag-3'} class="my-draggable">
+			<span>Drag me 3 </span>
+		</Drag>
+		<!-- <DragNDrop asElement={'div'} id={'drop-1'} class={['drop-zone']}></DragNDrop>
+		<DragNDrop asElement={'div'} id={'drop-2'} class={['drop-zone']}></DragNDrop>
+		<DragNDrop asElement={'div'} id={'dnd-items'} class={['drop-zone']}></DragNDrop> -->
+	</Drop>
+	<Drop class="drop-1 drop-zone" id={'drop-1'} orientation={'horizontal'}>
+		<!-- <button class="my-button" onclick={addNewDrag}>Add new Item</button>
 		{#each draggables as draggable, index}
 			<Drag class="my-draggable" id={draggable + index}>{draggable} {index}</Drag>
-		{/each}
+		{/each} -->
 	</Drop>
-	<Drag id={'drag-4'} class="my-dnd">
-		<Drop class="drop-2 drop-zone" id={'drop-2'} />
-	</Drag> -->
-	{#each draggables as draggable, idx}
+	<Drop class="drop-2 drop-zone" id={'drop-2'} orientation={'horizontal'} />
+
+	<!-- {#each draggables as draggable, idx}
 		{@render Drag(new DragController(), `${draggable}-${idx}`, idx)}
-	{/each}
-	<section use:asDrop1 class="drop-zone" id="drop-1"></section>
-	<section use:asDrop2 class="drop-zone" id="drop-2"></section>
+	{/each} -->
 </main>
 
 <style>
 	:global {
 		.my-dnd {
 			width: 100% !important;
+		}
+		#drop-main {
+			gap: 10px;
 		}
 		.drop-zone {
 			display: flex;
@@ -80,9 +74,13 @@
 			border-radius: 20px;
 			margin: 20px 0;
 		}
+		#dnd-items {
+			background-color: #8f7c9054;
+			border-radius: 20px;
+			margin: 20px 0;
+		}
 		.my-button {
 			background-color: rgb(4, 55, 94);
-			view-transition-name: my-button;
 			width: fit-content;
 			height: fit-content;
 			color: currentColor;

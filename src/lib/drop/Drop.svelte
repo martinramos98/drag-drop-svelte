@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { isClassInRestrictionList, isIdInRestrictionList } from '$lib/utils/drop.util.js';
+	import { DropController } from './drop.controller.svelte.js';
 	import { type Snippet } from 'svelte';
+	import type { Action } from 'svelte/action';
 	export interface DropProps {
 		asElement?: string;
 		children?: Snippet;
@@ -10,7 +11,8 @@
 		onDragEnter?: () => void;
 		OnDragLeave?: () => void;
 		disableDrop?: boolean;
-		orientation: 'horizontal' | 'vertical' | 'both';
+		orientation: 'horizontal' | 'vertical' | 'grid';
+		action?: Action;
 		restrictions?: {
 			id: string[];
 			class: string[];
@@ -26,50 +28,29 @@
 		OnDragLeave,
 		restrictions,
 		class: className,
+		orientation,
 		id,
 		disableDrop = false,
+		action = () => {},
 		...props
 	}: DropProps = $props();
-	let isDragOver = $state(false);
-	function customEvents(node: HTMLElement) {
-		node.addEventListener('onDrop', async (ev: CustomEvent) => {
-			isDragOver = false;
-			if (
-				restrictions &&
-				(isClassInRestrictionList(restrictions.class, ev.detail.classList) ||
-					isIdInRestrictionList(ev.detail.element.id, restrictions.id))
-			)
-				return;
-			const transition = document.startViewTransition(() => {
-				node.prepend(ev.detail.element);
-			});
-			await transition.ready;
-			ev.detail.dropEndFb();
-			onDrop?.();
-		});
-		node.addEventListener('onDragOver', () => {
-			onDragOver?.();
-		});
-		node.addEventListener('onDragEnter', () => {
-			onDragEnter?.();
-			isDragOver = true;
-		});
-		node.addEventListener('OnDragLeave', () => {
-			OnDragLeave?.();
-			isDragOver = false;
-		});
-	}
+	const dropController = new DropController();
+	$effect(() => {
+		dropController.disable = disableDrop;
+	});
 </script>
 
 <svelte:element
 	this={asElement}
-	data-disable-drop={disableDrop}
-	data-drag-over={isDragOver}
+	use:action
+	data-disable-drop={dropController.disable}
+	data-drag-over={dropController.isDragOver}
+	data-drop-orientation={orientation}
 	{id}
 	class={['dropable', className]}
 	{...props}
-	style="view-transition-name:{id};"
-	use:customEvents
+	style="view-transition-name:drop-{id};"
+	use:dropController.asDrop
 	ondragstart={(ev) => ev.preventDefault()}
 >
 	{@render children?.()}
@@ -80,8 +61,16 @@
 		padding: 20px;
 		z-index: 5;
 		position: relative;
+		display: flex;
 		min-height: 100px;
 		min-width: 100px;
+		&[data-drop-orientation='horizontal'] {
+			flex-direction: row;
+		}
+
+		&[data-drop-orientation='vertical'] {
+			flex-direction: column;
+		}
 	}
 	:global {
 		.dropable:has(.draggable[data-dragging='true']) {

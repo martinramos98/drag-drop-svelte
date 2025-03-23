@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { isPointOverDrop } from '$lib/utils/drag.util.js';
 	import type { Snippet } from 'svelte';
-	import type { SvelteHTMLElements } from 'svelte/elements';
-	import { Spring } from 'svelte/motion';
+	import { DragController } from './drag.controller.svelte.js';
 	export interface DragProps {
 		asElement?: string;
 		children: Snippet<[any]>;
@@ -11,7 +9,7 @@
 		onDragStart?: () => void;
 		onDragEnd?: () => void;
 		disableDrag?: boolean;
-		withCustomAnchor?: boolean;
+		data?: any;
 	}
 	const {
 		asElement = 'div',
@@ -20,106 +18,44 @@
 		onDrag,
 		onDragStart,
 		onDragEnd,
-		disableDrag,
-		withCustomAnchor = false,
+		disableDrag = false,
+		data,
 		id,
 		...props
 	}: DragProps & Partial<any> = $props();
-	let previousClientMouseValue = { x: 0, y: 0 };
-	let actualPositionTranslation = { x: 0, y: 0 };
-	let dragging = $state(false);
-	let dragOnDropState: 'entered' | 'none' | 'over' = 'none';
-	const springPosition = new Spring(
-		{ x: 0, y: 0 },
-		{
-			damping: 0.45,
-			stiffness: 0.16
-		}
-	);
-	let elementToMove: HTMLElement;
-	let lastDropEntered: HTMLElement;
-	function startDrag(ev: MouseEvent) {
-		previousClientMouseValue = { x: ev.clientX, y: ev.clientY };
-		dragging = true;
-		window.addEventListener('mousemove', onMouseMove);
-		window.addEventListener('mouseup', endDrag);
-		onDragStart?.();
-		ev.preventDefault();
-		ev.stopImmediatePropagation();
-	}
-	function endDrag(ev: MouseEvent) {
-		console.log('end drag');
-		const dropEl = isPointOverDrop(ev.clientX, ev.clientY, elementToMove);
-		if (dropEl) {
-			dropEl.dispatchEvent(
-				new CustomEvent('onDrop', {
-					detail: {
-						element: elementToMove,
-						dropEndFb: () => {
-							actualPositionTranslation.x = 0;
-							actualPositionTranslation.y = 0;
-							springPosition.target = actualPositionTranslation;
-							dragging = false;
-						}
-					}
-				})
-			);
-		} else {
-			actualPositionTranslation.x = 0;
-			actualPositionTranslation.y = 0;
-			springPosition.target = actualPositionTranslation;
-			dragging = false;
-		}
-		window.removeEventListener('mousemove', onMouseMove);
-		window.removeEventListener('mouseup', endDrag);
-	}
-	function onMouseMove(ev: MouseEvent) {
-		actualPositionTranslation = {
-			x: actualPositionTranslation.x + (ev.clientX - previousClientMouseValue.x),
-			y: actualPositionTranslation.y + (ev.clientY - previousClientMouseValue.y)
-		};
-
-		const dropEl = isPointOverDrop(ev.clientX, ev.clientY, elementToMove);
-		if (!!dropEl && dragOnDropState === 'none') {
-			dragOnDropState = 'entered';
-			dropEl.dispatchEvent(new CustomEvent('onDragEnter'));
-			lastDropEntered = dropEl;
-		} else if (!dropEl && dragOnDropState === 'entered') {
-			dragOnDropState = 'none';
-			lastDropEntered.dispatchEvent(new CustomEvent('OnDragLeave'));
-		} else if (!!dropEl && dragOnDropState === 'entered') {
-			dropEl.dispatchEvent(new CustomEvent('onDragOver'));
-		}
-		springPosition.target = actualPositionTranslation;
-		previousClientMouseValue = { x: ev.clientX, y: ev.clientY };
-
-		onDrag?.();
-	}
-	function asAnchorDrag(node: HTMLElement) {
-		if (disableDrag) return;
-		node.addEventListener('mousedown', startDrag);
-	}
-	function asAnchorDragDefaultElement(node: HTMLElement) {
-		if (!withCustomAnchor && !disableDrag) asAnchorDrag(node);
-	}
+	const dragController = new DragController(data);
+	const asAnchor = dragController.asAnchorDrag;
+	$effect(() => {
+		dragController.disable = disableDrag;
+	});
 </script>
 
-<svelte:element
-	this={asElement}
-	bind:this={elementToMove}
-	use:asAnchorDragDefaultElement
-	data-dragging={dragging}
-	class={[!disableDrag && 'draggable', className]}
-	{...props}
-	style="translate: {springPosition.current.x}px {springPosition.current
-		.y}px; view-transition-name:{id}"
+<div
+	data-drag-id={id}
+	style="display:contents;--draggable-translate:{dragController.translation.current
+		.x}px {dragController.translation.current.y}px;"
 >
-	{@render children?.(asAnchorDrag)}
-</svelte:element>
+	<svelte:element
+		this={asElement}
+		use:dragController.asDrag
+		use:asAnchor
+		data-dragging={dragController.dragging}
+		data-disable-drag={dragController.disable}
+		class={[!disableDrag && 'draggable', className]}
+		{id}
+		{...props}
+		style="view-transition-name:drag-{id}"
+	>
+		{@render children?.(asAnchor)}
+	</svelte:element>
+</div>
 
 <style>
 	.draggable {
-		will-change: translate;
+		translate: var(--draggable-translate);
+	}
+	.draggable,
+	.placeholder {
 		cursor: grab;
 		height: fit-content;
 		width: fit-content;
@@ -128,8 +64,10 @@
 		/* view-transition-class: draggable; */
 	}
 	[data-dragging='true'] {
+		will-change: translate;
 		cursor: grabbing;
 		z-index: 1000;
+		position: absolute;
 	}
 	html::view-transition-group(.draggable) {
 		animation-duration: 0.3s;
